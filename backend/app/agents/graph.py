@@ -37,10 +37,10 @@ def build_agent_graph(
 
     # ─── Nodes ───────────────────────────────────────────────────────────────
 
-    def call_llm(state: AgentState) -> dict:
+    async def call_llm(state: AgentState) -> dict:
         """Send messages to the LLM and get a response."""
         messages = [SystemMessage(content=system_prompt)] + state["messages"]
-        response = llm_with_tools.invoke(messages)
+        response = await llm_with_tools.ainvoke(messages)
         return {"messages": [response]}
 
     tool_node = ToolNode(tools) if tools else None

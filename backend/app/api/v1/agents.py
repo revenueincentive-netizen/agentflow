@@ -266,15 +266,33 @@ async def chat(
 
     if body.stream:
         async def event_stream() -> AsyncGenerator[str, None]:
-            async for chunk in compiled_graph.astream(state, stream_mode="messages"):
-                if chunk and hasattr(chunk[0], "content") and chunk[0].content:
-                    yield f"data: {chunk[0].content}\n\n"
+            full_response = ""
+            try:
+                async for chunk in compiled_graph.astream(state, stream_mode="messages"):
+                    if not chunk:
+                        continue
+                    msg = chunk[0]
+                    if not hasattr(msg, "content") or not msg.content:
+                        continue
+                    # Gemini returns content as list of parts; others return a string
+                    raw = msg.content
+                    text = ""
+                    if isinstance(raw, str):
+                        text = raw
+                    elif isinstance(raw, list):
+                        text = "".join(p.get("text", "") if isinstance(p, dict) else str(p) for p in raw)
+                    if text:
+                        full_response += text
+                        yield f"data: {text}\n\n"
+            except Exception as e:
+                yield f"data: [ERROR] {e}\n\n"
+                yield "data: [DONE]\n\n"
+                return
             # Persist conversation after streaming
-            new_messages = prior_messages + [
+            conversation.messages = prior_messages + [
                 {"role": "user", "content": body.message},
-                {"role": "assistant", "content": "[streamed]"},
+                {"role": "assistant", "content": full_response or "[no response]"},
             ]
-            conversation.messages = new_messages
             await db.commit()
             yield "data: [DONE]\n\n"
 
