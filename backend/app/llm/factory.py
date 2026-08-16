@@ -14,8 +14,8 @@ Supported providers:
 """
 
 from langchain_anthropic import ChatAnthropic
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
+from app.llm.gemini_interactions import ChatGeminiInteractions
 
 try:
     from langchain_ollama import ChatOllama
@@ -68,9 +68,9 @@ def build_llm(provider: str, model: str, encrypted_api_key: str, extra: dict):
             )
 
         case "google":
-            return ChatGoogleGenerativeAI(
+            return ChatGeminiInteractions(
                 model=model,
-                google_api_key=api_key,
+                api_key=api_key,
                 temperature=extra.get("temperature", 0.2),
                 max_output_tokens=extra.get("max_tokens", 4096),
             )
