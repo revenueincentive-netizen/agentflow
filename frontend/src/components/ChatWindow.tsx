@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Loader2, Bot, User, Plus, Clock, ChevronLeft } from 'lucide-react'
+import { Send, Loader2, Bot, User, Plus, Clock, ChevronLeft, Trash2, Search } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import type { Message } from '../types'
 
@@ -20,6 +20,8 @@ export default function ChatWindow({ agentId, agentName }: ChatWindowProps) {
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [conversations, setConversations] = useState<ConvSummary[]>([])
   const [showHistory, setShowHistory] = useState(false)
+  const [statusText, setStatusText] = useState('')
+  const [historySearch, setHistorySearch] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const storageKey = `conv_${agentId}`
@@ -58,6 +60,20 @@ export default function ChatWindow({ agentId, agentName }: ChatWindowProps) {
     setShowHistory(false)
   }
 
+  const deleteConversation = async (e: React.MouseEvent, convId: string) => {
+    e.stopPropagation()
+    await fetch(`${baseUrl}/api/v1/agents/${agentId}/conversations/${convId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    setConversations(prev => prev.filter(c => c.id !== convId))
+    if (conversationId === convId) {
+      setMessages([])
+      setConversationId(null)
+      localStorage.removeItem(storageKey)
+    }
+  }
+
   const startNewChat = () => {
     setMessages([])
     setConversationId(null)
@@ -94,6 +110,7 @@ export default function ChatWindow({ agentId, agentName }: ChatWindowProps) {
     let assistantContent = ''
     let activeConvId = conversationId
     setMessages(m => [...m, { role: 'assistant', content: '' }])
+    setStatusText('')
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
 
@@ -109,29 +126,39 @@ export default function ChatWindow({ agentId, agentName }: ChatWindowProps) {
             setConversationId(activeConvId)
             continue
           }
+          if (text.startsWith('[STATUS:')) {
+            setStatusText(text.slice(8, -1))
+            continue
+          }
           if (text.startsWith('[ERROR]')) {
             const errMsg = text.slice(7).trim()
             setMessages(m => { const u = [...m]; u[u.length - 1] = { role: 'assistant', content: `⚠️ ${errMsg}` }; return u })
             break
           }
+          setStatusText('')
           assistantContent += text
           setMessages(m => { const u = [...m]; u[u.length - 1] = { role: 'assistant', content: assistantContent }; return u })
         }
       }
     }
 
-    // Persist conversation to localStorage
+    // Persist conversation to localStorage (cap to last 50 messages)
     setMessages(current => {
       if (activeConvId) {
-        localStorage.setItem(storageKey, JSON.stringify({ convId: activeConvId, msgs: current }))
+        const capped = current.slice(-50)
+        localStorage.setItem(storageKey, JSON.stringify({ convId: activeConvId, msgs: capped }))
       }
       return current
     })
+    setStatusText('')
     setLoading(false)
   }
 
   // ── History panel ──────────────────────────────────────────────────────────
   if (showHistory) {
+    const filtered = historySearch
+      ? conversations.filter(c => c.preview.toLowerCase().includes(historySearch.toLowerCase()))
+      : conversations
     return (
       <div className="flex flex-col h-full bg-surface-50">
         <div className="px-6 py-4 border-b bg-white flex items-center gap-3 shadow-card">
@@ -143,20 +170,40 @@ export default function ChatWindow({ agentId, agentName }: ChatWindowProps) {
             <Plus size={13} /> New chat
           </button>
         </div>
+        <div className="px-4 pt-3 pb-1">
+          <div className="relative">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
+            <input
+              value={historySearch}
+              onChange={e => setHistorySearch(e.target.value)}
+              placeholder="Search conversations..."
+              className="w-full pl-8 pr-3 py-2 text-sm rounded-lg border border-surface-200 bg-white focus:outline-none focus:border-brand-400"
+            />
+          </div>
+        </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {conversations.length === 0 && (
-            <p className="text-sm text-ink-muted text-center py-10">No past conversations yet.</p>
+          {filtered.length === 0 && (
+            <p className="text-sm text-ink-muted text-center py-10">
+              {historySearch ? 'No matching conversations.' : 'No past conversations yet.'}
+            </p>
           )}
-          {conversations.map(conv => (
-            <button key={conv.id} onClick={() => resumeConversation(conv)}
-              className={`w-full text-left px-4 py-3 rounded-xl border bg-white hover:border-brand-400 hover:shadow-card transition-all ${conv.id === conversationId ? 'border-brand-400 ring-1 ring-brand-400' : 'border-surface-200'}`}>
-              <p className="text-sm text-ink font-medium line-clamp-1">{conv.preview}</p>
-              <div className="flex items-center gap-1.5 mt-1">
-                <Clock size={11} className="text-ink-faint" />
-                <span className="text-xs text-ink-faint">{new Date(conv.updated_at).toLocaleString()}</span>
-                <span className="text-xs text-ink-faint ml-auto">{conv.message_count} messages</span>
-              </div>
-            </button>
+          {filtered.map(conv => (
+            <div key={conv.id} className={`group relative flex items-start rounded-xl border bg-white hover:border-brand-400 hover:shadow-card transition-all ${conv.id === conversationId ? 'border-brand-400 ring-1 ring-brand-400' : 'border-surface-200'}`}>
+              <button onClick={() => resumeConversation(conv)} className="flex-1 text-left px-4 py-3">
+                <p className="text-sm text-ink font-medium line-clamp-1">{conv.preview}</p>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <Clock size={11} className="text-ink-faint" />
+                  <span className="text-xs text-ink-faint">{new Date(conv.updated_at).toLocaleString()}</span>
+                  <span className="text-xs text-ink-faint ml-auto">{conv.message_count} messages</span>
+                </div>
+              </button>
+              <button
+                onClick={e => deleteConversation(e, conv.id)}
+                className="opacity-0 group-hover:opacity-100 p-2 m-2 rounded-lg hover:bg-red-50 text-ink-faint hover:text-red-500 transition-all"
+                title="Delete conversation">
+                <Trash2 size={13} />
+              </button>
+            </div>
           ))}
         </div>
       </div>
@@ -230,11 +277,15 @@ export default function ChatWindow({ agentId, agentName }: ChatWindowProps) {
               <Bot size={13} className="text-white" />
             </div>
             <div className="bg-white border border-surface-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-card">
-              <div className="flex gap-1">
-                {[0, 1, 2].map(i => (
-                  <div key={i} className="w-1.5 h-1.5 rounded-full bg-ink-faint animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-                ))}
-              </div>
+              {statusText ? (
+                <p className="text-xs text-ink-muted italic animate-pulse">{statusText}</p>
+              ) : (
+                <div className="flex gap-1">
+                  {[0, 1, 2].map(i => (
+                    <div key={i} className="w-1.5 h-1.5 rounded-full bg-ink-faint animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

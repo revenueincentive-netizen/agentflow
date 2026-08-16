@@ -3,7 +3,7 @@
 import uuid
 from typing import Annotated, AsyncGenerator
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage, AIMessage
 from pydantic import BaseModel
@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.core.limiter import limiter
 from app.core.security import decrypt_secret
 from app.models import Agent, Connector, Conversation, LLMConfig, User
 from app.agents.graph import build_agent_graph
@@ -107,23 +108,23 @@ async def list_conversations(
     agent_id: uuid.UUID,
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    q: str | None = None,
 ):
-    """Return the 20 most recent conversations for this agent."""
+    """Return the 20 most recent conversations for this agent, optionally filtered by keyword."""
     from sqlalchemy import desc
     result = await db.execute(
         select(Conversation)
         .where(Conversation.agent_id == agent_id, Conversation.tenant_id == user.tenant_id)
         .order_by(desc(Conversation.updated_at))
-        .limit(20)
+        .limit(100)  # fetch more so we can filter client-side via q
     )
     convs = result.scalars().all()
-    return [
+    rows = [
         {
             "id": str(c.id),
             "created_at": c.created_at.isoformat(),
             "updated_at": c.updated_at.isoformat(),
             "message_count": len(c.messages or []),
-            # First user message as preview title
             "preview": next(
                 (m["content"][:80] for m in (c.messages or []) if m.get("role") == "user"),
                 "Empty conversation",
@@ -132,6 +133,32 @@ async def list_conversations(
         }
         for c in convs
     ]
+    if q:
+        q_lower = q.lower()
+        rows = [r for r in rows if q_lower in r["preview"].lower()]
+    return rows[:20]
+
+
+@router.delete("/{agent_id}/conversations/{conv_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_conversation(
+    agent_id: uuid.UUID,
+    conv_id: uuid.UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Delete a single conversation."""
+    result = await db.execute(
+        select(Conversation).where(
+            Conversation.id == conv_id,
+            Conversation.agent_id == agent_id,
+            Conversation.tenant_id == user.tenant_id,
+        )
+    )
+    conv = result.scalar_one_or_none()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    await db.delete(conv)
+    await db.commit()
 
 
 @router.get("/templates")
@@ -231,7 +258,9 @@ async def update_agent(
 
 
 @router.post("/{agent_id}/chat")
+@limiter.limit("30/minute")
 async def chat(
+    request: Request,
     agent_id: uuid.UUID,
     body: ChatRequest,
     user: Annotated[User, Depends(get_current_user)],
@@ -300,25 +329,20 @@ async def chat(
 
     if body.stream:
         async def event_stream() -> AsyncGenerator[str, None]:
-            # Send conversation_id first so the client can maintain context
             yield f"data: [CONV:{conversation.id}]\n\n"
             full_response = ""
-            try:
-                # Use ainvoke (reliable) then stream the result in word-sized chunks
-                result_state = await compiled_graph.ainvoke(state)
-                last_msg = result_state["messages"][-1]
-                raw = last_msg.content
+
+            def _extract_text(raw) -> str:
                 if isinstance(raw, str):
-                    full_response = raw
-                elif isinstance(raw, list):
-                    full_response = "".join(
-                        p.get("text", "") if isinstance(p, dict) else str(p)
-                        for p in raw
-                    )
-                else:
-                    full_response = str(raw)
-                # Stream in ~40-char chunks for a typing effect
-                words = full_response.split(" ")
+                    return raw
+                if isinstance(raw, list):
+                    return "".join(p.get("text", "") if isinstance(p, dict) else str(p) for p in raw)
+                return str(raw)
+
+            async def _stream_text(text: str):
+                nonlocal full_response
+                full_response = text
+                words = text.split(" ")
                 buf = ""
                 for word in words:
                     buf += ("" if not buf else " ") + word
@@ -327,10 +351,48 @@ async def chat(
                         buf = ""
                 if buf:
                     yield f"data: {buf}\n\n"
+
+            try:
+                # Stream via astream so we can emit tool-status events in real time
+                async for chunk in compiled_graph.astream(state):
+                    for node_name, node_output in chunk.items():
+                        if node_name == "tools":
+                            for msg in node_output.get("messages", []):
+                                tool_name = getattr(msg, "name", "data source")
+                                yield f"data: [STATUS:Searching {tool_name}...]\n\n"
+                        elif node_name == "call_llm":
+                            for msg in node_output.get("messages", []):
+                                if not (hasattr(msg, "tool_calls") and msg.tool_calls):
+                                    async for chunk_data in _stream_text(_extract_text(msg.content)):
+                                        yield chunk_data
             except Exception as e:
-                yield f"data: [ERROR] {e}\n\n"
-                yield "data: [DONE]\n\n"
-                return
+                err_str = str(e)
+                # Fallback to a lighter model on overload / 503
+                if any(code in err_str for code in ["503", "UNAVAILABLE", "overloaded"]):
+                    for fallback_model in ["gemini-3.1-flash-lite", "gemini-flash-lite-latest"]:
+                        try:
+                            fb_graph = build_agent_graph(
+                                provider=llm_cfg.provider,
+                                model=fallback_model,
+                                encrypted_api_key=llm_cfg.encrypted_api_key,
+                                extra={**llm_cfg.extra, **agent.settings},
+                                system_prompt=agent.system_prompt,
+                                tools=tools,
+                            )
+                            result_state = await fb_graph.ainvoke(state)
+                            async for chunk_data in _stream_text(_extract_text(result_state["messages"][-1].content)):
+                                yield chunk_data
+                            break
+                        except Exception:
+                            continue
+                    else:
+                        yield "data: [ERROR] Service temporarily unavailable — please try again.\n\n"
+                        yield "data: [DONE]\n\n"
+                        return
+                else:
+                    yield f"data: [ERROR] {e}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
             conversation.messages = prior_messages + [
                 {"role": "user", "content": body.message},
                 {"role": "assistant", "content": full_response or "[no response]"},
