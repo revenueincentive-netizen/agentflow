@@ -52,6 +52,10 @@ export default function ChatWindow({ agentId, agentName }: ChatWindowProps) {
         if (line.startsWith('data: ')) {
           const text = line.slice(6)
           if (text === '[DONE]') break
+          if (text.startsWith('[CONV:')) {
+            setConversationId(text.slice(6, -1))
+            continue
+          }
           if (text.startsWith('[ERROR]')) {
             const errMsg = text.slice(7).trim()
             setMessages(m => { const u = [...m]; u[u.length - 1] = { role: 'assistant', content: `⚠️ ${errMsg}` }; return u })

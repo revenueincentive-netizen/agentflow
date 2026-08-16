@@ -268,6 +268,8 @@ async def chat(
 
     if body.stream:
         async def event_stream() -> AsyncGenerator[str, None]:
+            # Send conversation_id first so the client can maintain context
+            yield f"data: [CONV:{conversation.id}]\n\n"
             full_response = ""
             try:
                 # Use ainvoke (reliable) then stream the result in word-sized chunks
