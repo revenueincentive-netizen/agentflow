@@ -77,7 +77,8 @@ async def _resolve_tools(connector_ids: list[str], tenant_id: str, db: AsyncSess
         cfg = conn.config
         match conn.connector_type:
             case "file":
-                tools.append(make_rag_search_tool(tenant_id, str(conn.id)))
+                file_content = (conn.config or {}).get("file_content", "")
+                tools.append(make_rag_search_tool(str(conn.id), file_content))
             case "sql":
                 tools.append(make_sql_tool(cfg["connection_string"], cfg.get("allowed_tables", [])))
             case "rest_api":

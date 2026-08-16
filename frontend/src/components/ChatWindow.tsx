@@ -29,6 +29,16 @@ export default function ChatWindow({ agentId, agentName }: ChatWindowProps) {
       body: JSON.stringify({ message: input, conversation_id: conversationId, stream: true }),
     })
     if (!res.body) { setLoading(false); return }
+    if (!res.ok) {
+      try {
+        const err = await res.json()
+        setMessages(m => { const u = [...m]; u[u.length - 1] = { role: 'assistant', content: `⚠️ ${err.detail || 'Request failed'}` }; return u })
+      } catch {
+        setMessages(m => { const u = [...m]; u[u.length - 1] = { role: 'assistant', content: `⚠️ Server error (${res.status})` }; return u })
+      }
+      setLoading(false)
+      return
+    }
 
     let assistantContent = ''
     setMessages(m => [...m, { role: 'assistant', content: '' }])

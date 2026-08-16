@@ -99,21 +99,18 @@ async def upload_file(
     if len(content) > max_bytes:
         raise HTTPException(status_code=413, detail=f"File exceeds {settings.MAX_UPLOAD_SIZE_MB} MB limit")
 
-    # Save to disk (in production replace with object storage e.g. Azure Blob / S3)
-    upload_dir = os.path.join(settings.UPLOAD_DIR, str(user.tenant_id), str(connector_id))
-    os.makedirs(upload_dir, exist_ok=True)
-    file_path = os.path.join(upload_dir, file.filename or "upload")
+    # Decode text content (CSV, TXT, TSV) and store directly in DB config
+    # This avoids ephemeral filesystem loss on Railway redeploys
+    filename = file.filename or "upload"
+    already_exists = bool((connector.config or {}).get("filename") == filename)
+    try:
+        text_content = content.decode("utf-8")
+    except UnicodeDecodeError:
+        text_content = content.decode("latin-1", errors="replace")
 
-    # Check for duplicate filename
-    already_exists = os.path.exists(file_path)
-
-    with open(file_path, "wb") as f:
-        f.write(content)
-
-    # Store filename in config and mark ready immediately (no background vector indexing in this tier)
     cfg = dict(connector.config or {})
-    cfg["filename"] = file.filename
-    cfg["file_path"] = file_path
+    cfg["filename"] = filename
+    cfg["file_content"] = text_content
     connector.config = cfg
     connector.rag_status = "ready"
     await db.commit()

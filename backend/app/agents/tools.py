@@ -11,50 +11,25 @@ import httpx
 import sqlalchemy
 from langchain_core.tools import tool
 
-try:
-    from qdrant_client import QdrantClient
-    _QDRANT_AVAILABLE = True
-except ImportError:
-    _QDRANT_AVAILABLE = False
-
 from app.core.config import settings
 
 
-# ─── File / RAG search ───────────────────────────────────────────────────────
+# ─── File / data search ──────────────────────────────────────────────────────
 
-def make_rag_search_tool(tenant_id: str, connector_id: str):
-    """Returns a closure-based tool that searches the tenant's RAG collection."""
+def make_rag_search_tool(connector_id: str, file_content: str):
+    """Returns a tool that returns the uploaded file content for the LLM to analyze."""
 
-    if not _QDRANT_AVAILABLE:
-        @tool
-        def rag_search(query: str) -> str:
-            """Search uploaded company documents."""
-            return "RAG search unavailable: Qdrant not configured."
-        return rag_search
-
-    collection_name = f"tenant_{tenant_id}_connector_{connector_id}"
-    client = QdrantClient(url=settings.QDRANT_URL, api_key=settings.QDRANT_API_KEY)
+    content_snapshot = file_content[:60_000] if file_content else ""  # cap at ~60k chars
 
     @tool
-    def rag_search(query: str) -> str:
-        """Search uploaded company documents for relevant information. Use for questions about internal files, PDFs, and reports."""
-        from langchain_openai import OpenAIEmbeddings  # lazy import
+    def search_data(query: str) -> str:
+        """Retrieve data from the uploaded file to answer questions. Always call this tool when asked about pipeline, deals, revenue, or any data from connected files."""
+        if not content_snapshot:
+            return "No file data available. Please upload a file to this connector."
+        return content_snapshot
 
-        embeddings = OpenAIEmbeddings()
-        vector = embeddings.embed_query(query)
-        results = client.search(
-            collection_name=collection_name,
-            query_vector=vector,
-            limit=5,
-            with_payload=True,
-        )
-        if not results:
-            return "No relevant documents found."
-        chunks = [r.payload.get("text", "") for r in results]
-        return "\n\n---\n\n".join(chunks)
-
-    rag_search.__name__ = f"rag_search_{connector_id[:8]}"
-    return rag_search
+    search_data.__name__ = f"search_data_{connector_id[:8]}"
+    return search_data
 
 
 # ─── SQL connector ───────────────────────────────────────────────────────────
