@@ -36,7 +36,7 @@ export default function Templates() {
 
   const { data: templates = [] } = useQuery({
     queryKey: ['templates'],
-    queryFn: () => api.get('/agents/templates/').then(r => r.data),
+    queryFn: () => api.get('/agents/templates').then(r => r.data),
   })
   const { data: connectors = [] } = useQuery({
     queryKey: ['connectors'],
@@ -70,7 +70,7 @@ export default function Templates() {
         </div>
         <h1 className="text-2xl font-bold text-ink mb-1">Domain expertise built in.<br className="hidden sm:block" /> Not prompted in.</h1>
         <p className="text-sm text-ink-muted max-w-lg leading-relaxed">
-          Pre-built sales agents grounded in proven methodology. Deploy in one click — customise for your team. Your LLM, your data, your rules.
+          Pre-built sales agents grounded in proven methodology. Deploy in one click &mdash; customise for your team. Your LLM, your data, your rules.
         </p>
       </div>
 
