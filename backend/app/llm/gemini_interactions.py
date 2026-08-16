@@ -193,15 +193,10 @@ class ChatGeminiInteractions(BaseChatModel):
             kwargs["tools"] = [genai_types.Tool(function_declarations=declarations)]
         return genai_types.GenerateContentConfig(**kwargs)
 
-    # ── Client factory (uses v1alpha = Interactions API endpoint) ────────────
+    # ── Client factory ────────────────────────────────────────────────────────
 
     def _make_client(self) -> "genai.Client":
-        # v1beta is the OLD API (deprecated for new users).
-        # v1alpha is the Interactions API endpoint that works for new accounts.
-        return genai.Client(
-            api_key=self.api_key,
-            http_options=genai_types.HttpOptions(api_version="v1alpha"),
-        )
+        return genai.Client(api_key=self.api_key)
 
     # ── Sync generation (required by BaseChatModel) ───────────────────────────
 
@@ -231,56 +226,12 @@ class ChatGeminiInteractions(BaseChatModel):
         run_manager: Any = None,
         **kwargs: Any,
     ) -> ChatResult:
+        client = self._make_client()
         system_instruction, contents = _messages_to_genai(messages)
         config = self._build_config(system_instruction)
-
-        # Strategy 1: v1alpha via API key (Interactions API endpoint)
-        try:
-            client = genai.Client(
-                api_key=self.api_key,
-                http_options=genai_types.HttpOptions(api_version="v1alpha"),
-            )
-            response = await client.aio.models.generate_content(
-                model=self.model,
-                contents=contents,
-                config=config,
-            )
-            return ChatResult(generations=[ChatGeneration(message=_response_to_ai_message(response))])
-        except Exception as e1:
-            pass
-
-        # Strategy 2: v1beta via API key (old default — might work for some model names)
-        try:
-            client = genai.Client(api_key=self.api_key)
-            response = await client.aio.models.generate_content(
-                model=self.model,
-                contents=contents,
-                config=config,
-            )
-            return ChatResult(generations=[ChatGeneration(message=_response_to_ai_message(response))])
-        except Exception as e2:
-            pass
-
-        # Strategy 3: Bearer token auth (for AQ. keys which may be OAuth2 access tokens)
-        try:
-            from google.oauth2.credentials import Credentials
-            creds = Credentials(token=self.api_key)
-            client = genai.Client(
-                credentials=creds,
-                http_options=genai_types.HttpOptions(api_version="v1alpha"),
-            )
-            response = await client.aio.models.generate_content(
-                model=self.model,
-                contents=contents,
-                config=config,
-            )
-            return ChatResult(generations=[ChatGeneration(message=_response_to_ai_message(response))])
-        except Exception as e3:
-            raise RuntimeError(
-                f"All Gemini auth strategies failed.\n"
-                f"  v1alpha+api_key: {e1}\n"
-                f"  v1beta+api_key: {e2}\n"
-                f"  v1alpha+bearer: {e3}\n"
-                f"Your API key starts with '{self.api_key[:8]}...'. "
-                f"Generate a standard key at https://aistudio.google.com/apikey"
-            )
+        response = await client.aio.models.generate_content(
+            model=self.model,
+            contents=contents,
+            config=config,
+        )
+        return ChatResult(generations=[ChatGeneration(message=_response_to_ai_message(response))])
