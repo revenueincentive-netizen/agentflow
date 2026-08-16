@@ -39,7 +39,7 @@ app.add_middleware(
 )
 
 if settings.ENVIRONMENT == "production":
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["agentflow.yourdomain.com"])
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*.up.railway.app", "*.railway.app", "localhost"])
 
 # ─── Routes ──────────────────────────────────────────────────────────────────
 
