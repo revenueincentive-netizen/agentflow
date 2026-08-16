@@ -22,7 +22,8 @@ export default function ChatWindow({ agentId, agentName }: ChatWindowProps) {
     setLoading(true)
 
     const token = localStorage.getItem('access_token')
-    const res = await fetch(`/api/v1/agents/${agentId}/chat`, {
+    const baseUrl = import.meta.env.VITE_API_URL ?? ''
+    const res = await fetch(`${baseUrl}/api/v1/agents/${agentId}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ message: input, conversation_id: conversationId, stream: true }),
