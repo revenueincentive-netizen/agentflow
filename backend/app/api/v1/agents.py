@@ -198,6 +198,7 @@ async def update_agent(
                     settings=agent.settings, is_active=agent.is_active, is_public=agent.is_public)
 
 
+@router.post("/{agent_id}/chat")
 async def chat(
     agent_id: uuid.UUID,
     body: ChatRequest,
