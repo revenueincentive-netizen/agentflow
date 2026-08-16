@@ -102,6 +102,38 @@ async def _resolve_tools(connector_ids: list[str], tenant_id: str, db: AsyncSess
 
 # ─── Routes ──────────────────────────────────────────────────────────────────
 
+@router.get("/{agent_id}/conversations")
+async def list_conversations(
+    agent_id: uuid.UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Return the 20 most recent conversations for this agent."""
+    from sqlalchemy import desc
+    result = await db.execute(
+        select(Conversation)
+        .where(Conversation.agent_id == agent_id, Conversation.tenant_id == user.tenant_id)
+        .order_by(desc(Conversation.updated_at))
+        .limit(20)
+    )
+    convs = result.scalars().all()
+    return [
+        {
+            "id": str(c.id),
+            "created_at": c.created_at.isoformat(),
+            "updated_at": c.updated_at.isoformat(),
+            "message_count": len(c.messages or []),
+            # First user message as preview title
+            "preview": next(
+                (m["content"][:80] for m in (c.messages or []) if m.get("role") == "user"),
+                "Empty conversation",
+            ),
+            "messages": c.messages or [],
+        }
+        for c in convs
+    ]
+
+
 @router.get("/templates")
 async def list_templates(_: Annotated[User, Depends(get_current_user)]):
     """Return all pre-built sales agent templates."""
