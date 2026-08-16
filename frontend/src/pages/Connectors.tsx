@@ -52,14 +52,14 @@ export default function Connectors() {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/connectors/${id}/`),
+    mutationFn: (id: string) => api.delete(`/connectors/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['connectors'] }),
   })
 
   const uploadMutation = useMutation({
     mutationFn: ({ connectorId, file }: { connectorId: string; file: File }) => {
       const fd = new FormData(); fd.append('file', file)
-      return api.post(`/connectors/${connectorId}/upload/`, fd)
+      return api.post(`/connectors/${connectorId}/upload`, fd)
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['connectors'] }),
   })

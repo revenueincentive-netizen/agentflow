@@ -35,7 +35,7 @@ export default function Settings() {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/llm-configs/${id}/`),
+    mutationFn: (id: string) => api.delete(`/llm-configs/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['llm-configs'] }),
   })
 

@@ -34,7 +34,7 @@ export default function Agents() {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/agents/${id}/`),
+    mutationFn: (id: string) => api.delete(`/agents/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['agents'] }),
   })
 
