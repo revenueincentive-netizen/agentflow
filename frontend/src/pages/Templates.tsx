@@ -12,10 +12,10 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: 
   'map': Map, 'calculator': Calculator, 'trending-up': TrendingUp, 'shield-check': ShieldCheck,
 }
 
-const CATEGORY_CONFIG: Record<string, { label: string; pill: string; icon: string }> = {
-  sales:                { label: 'Sales',                pill: 'bg-brand-50 text-brand-700 border-brand-200',         icon: 'ðŸ’¼' },
-  sales_ops:            { label: 'Sales Ops',            pill: 'bg-violet-50 text-violet-700 border-violet-200',       icon: 'âš™ï¸' },
-  revenue_intelligence: { label: 'Revenue Intelligence', pill: 'bg-amber-50 text-amber-700 border-amber-200',          icon: 'ðŸ“ˆ' },
+const CATEGORY_CONFIG: Record<string, { label: string; pill: string }> = {
+  sales:                { label: 'Sales',                pill: 'bg-brand-50 text-brand-700 border-brand-200'   },
+  sales_ops:            { label: 'Sales Ops',            pill: 'bg-violet-50 text-violet-700 border-violet-200' },
+  revenue_intelligence: { label: 'Revenue Intelligence', pill: 'bg-amber-50 text-amber-700 border-amber-200'    },
 }
 
 const CARD_ACCENT: Record<string, string> = {
@@ -70,7 +70,7 @@ export default function Templates() {
         </div>
         <h1 className="text-2xl font-bold text-ink mb-1">Domain expertise built in.<br className="hidden sm:block" /> Not prompted in.</h1>
         <p className="text-sm text-ink-muted max-w-lg leading-relaxed">
-          Pre-built sales agents grounded in proven methodology. Deploy in one click â€” customise for your team. Your LLM, your data, your rules.
+          Pre-built sales agents grounded in proven methodology. Deploy in one click — customise for your team. Your LLM, your data, your rules.
         </p>
       </div>
 
@@ -83,7 +83,7 @@ export default function Templates() {
                 ? 'bg-ink text-white border-ink shadow-sm'
                 : 'bg-white text-ink-muted border-surface-200 hover:border-ink-faint hover:text-ink'
             }`}>
-            {cat === 'all' ? 'All agents' : (CATEGORY_CONFIG[cat]?.icon + ' ' + CATEGORY_CONFIG[cat]?.label) ?? cat}
+            {cat === 'all' ? 'All agents' : (CATEGORY_CONFIG[cat]?.label ?? cat)}
           </button>
         ))}
       </div>
@@ -108,7 +108,7 @@ export default function Templates() {
                   </div>
                   {cat && (
                     <span className={`badge border ${cat.pill} text-[10px]`}>
-                      {cat.icon} {cat.label}
+                      {cat.label}
                     </span>
                   )}
                 </div>
@@ -130,7 +130,7 @@ export default function Templates() {
                   disabled={deploying === template.id && createMutation.isPending}
                   className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 active:scale-[.98] disabled:opacity-50 bg-gradient-to-r ${accent} text-white shadow-sm hover:shadow-md`}>
                   {deploying === template.id && createMutation.isPending ? (
-                    <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Deployingâ€¦</>
+                    <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Deploying...</>
                   ) : (
                     <><Plus size={14} /> Deploy agent</>
                   )}

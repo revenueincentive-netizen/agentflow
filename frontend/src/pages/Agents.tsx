@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Bot, MessageSquare, Trash2, Zap, X, ChevronLeft } from 'lucide-react'
 import api from '../api/client'
@@ -133,7 +133,7 @@ export default function Agents() {
               <label className="text-xs font-medium text-ink-muted mb-1.5 block">System prompt</label>
               <textarea
                 rows={7}
-                placeholder="Instructions for the agentâ€¦"
+                placeholder="Instructions for the agent..."
                 value={form.system_prompt}
                 onChange={e => setForm(f => ({ ...f, system_prompt: e.target.value }))}
                 className="input resize-none h-full min-h-[140px]"
@@ -146,7 +146,7 @@ export default function Agents() {
               disabled={!form.name || createMutation.isPending}
               className="btn-primary"
             >
-              {createMutation.isPending ? 'Creatingâ€¦' : 'Create agent'}
+              {createMutation.isPending ? 'Creating...' : 'Create agent'}
             </button>
             <button onClick={() => setShowForm(false)} className="btn-secondary">Cancel</button>
           </div>

@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Plug, Trash2, Upload, Database, FileText, Globe, Share2, BarChart2, X } from 'lucide-react'
 import api from '../api/client'
@@ -143,7 +143,7 @@ export default function Connectors() {
               disabled={!form.name || createMutation.isPending}
               className="btn-primary"
             >
-              {createMutation.isPending ? 'Addingâ€¦' : 'Add connector'}
+              {createMutation.isPending ? 'Adding...' : 'Add connector'}
             </button>
             <button onClick={() => setShowForm(false)} className="btn-secondary">Cancel</button>
           </div>
@@ -194,7 +194,7 @@ export default function Connectors() {
                 )}
                 <div className="flex items-center justify-between mt-2">
                   <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${STATUS_STYLE[conn.rag_status] ?? STATUS_STYLE.not_indexed}`}>
-                    {conn.rag_status === 'not_indexed' ? 'Not indexed' : conn.rag_status === 'indexing' ? 'Indexingâ€¦' : 'Ready'}
+                    {conn.rag_status === 'not_indexed' ? 'Not indexed' : conn.rag_status === 'indexing' ? 'Indexing...' : 'Ready'}
                   </span>
                   {conn.connector_type === 'file' && (
                     <label className="flex items-center gap-1.5 text-xs font-medium text-brand-600 cursor-pointer hover:text-brand-700 transition-colors">

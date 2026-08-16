@@ -1,4 +1,4 @@
-﻿import { useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Bot, Plug, Zap, ChevronRight, CheckCircle2, ArrowRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import api from '../api/client'
@@ -7,7 +7,7 @@ import { useAuthStore } from '../store/authStore'
 const STEPS = [
   { step: 1, title: 'Add your LLM', desc: 'Plug in your OpenAI, Azure, Anthropic, or Google key.', to: '/settings', cta: 'Go to Settings' },
   { step: 2, title: 'Connect your CRM', desc: 'Give agents access to your live Salesforce or HubSpot pipeline.', to: '/connectors', cta: 'Add connector' },
-  { step: 3, title: 'Deploy a sales agent', desc: 'One-click deploy from pre-built templates â€” domain expertise included.', to: '/templates', cta: 'Browse templates' },
+  { step: 3, title: 'Deploy a sales agent', desc: 'One-click deploy from pre-built templates — domain expertise included.', to: '/templates', cta: 'Browse templates' },
 ]
 
 export default function Dashboard() {
@@ -106,7 +106,7 @@ export default function Dashboard() {
             <Zap size={22} className="text-brand-500" />
           </div>
           <p className="font-semibold text-ink mb-1">No agents deployed yet</p>
-          <p className="text-sm text-ink-muted mb-5">Start with a pre-built template â€” domain expertise included.</p>
+          <p className="text-sm text-ink-muted mb-5">Start with a pre-built template — domain expertise included.</p>
           <Link to="/templates" className="btn-primary inline-flex">
             <Zap size={15} /> Browse agent templates
           </Link>
