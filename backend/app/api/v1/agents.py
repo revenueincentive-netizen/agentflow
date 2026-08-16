@@ -5,7 +5,7 @@ from typing import Annotated, AsyncGenerator
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -285,7 +285,7 @@ async def chat(
 
     langchain_messages = [
         HumanMessage(content=m["content"]) if m["role"] == "user"
-        else type("AI", (), {"content": m["content"], "type": "ai"})()
+        else AIMessage(content=m["content"])
         for m in prior_messages
     ] + [HumanMessage(content=body.message)]
 
