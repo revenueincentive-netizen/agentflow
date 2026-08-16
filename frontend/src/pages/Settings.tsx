@@ -9,7 +9,7 @@ const PROVIDERS = [
   { value: 'azure_openai', label: 'Azure OpenAI', models: [], needsKey: true },
   { value: 'azure_foundry', label: 'Microsoft — Azure AI Foundry', models: ['Phi-4', 'Phi-4-mini', 'Meta-Llama-3.1-70B-Instruct', 'Mistral-Large-2411', 'Cohere-command-r-plus-08-2024'], needsKey: true },
   { value: 'anthropic', label: 'Anthropic (Claude)', models: ['claude-3-5-sonnet-20241022', 'claude-3-haiku-20240307'], needsKey: true },
-  { value: 'google', label: 'Google (Gemini)', models: ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'], needsKey: true },
+  { value: 'google', label: 'Google (Gemini)', models: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash-lite'], needsKey: true },
   { value: 'ollama', label: 'Ollama — Local models (Phi-4, Llama, Mistral)', models: ['phi4', 'phi4-mini', 'llama3.1', 'llama3.2', 'mistral', 'gemma2'], needsKey: false },
 ]
 
