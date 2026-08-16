@@ -63,9 +63,10 @@ export default function Connectors() {
       const fd = new FormData(); fd.append('file', file)
       return api.post(`/connectors/${connectorId}/upload`, fd)
     },
-    onSuccess: (_data, vars) => {
+    onSuccess: (data: any, vars) => {
       qc.invalidateQueries({ queryKey: ['connectors'] })
-      setUploadStatus(s => ({ ...s, [vars.connectorId]: { name: s[vars.connectorId]?.name ?? '', ok: true } }))
+      const msg = data?.data?.duplicate ? `✓ ${uploadStatus[vars.connectorId]?.name} (replaced existing file)` : `✓ ${uploadStatus[vars.connectorId]?.name ?? ''}`
+      setUploadStatus(s => ({ ...s, [vars.connectorId]: { name: s[vars.connectorId]?.name ?? '', ok: true, msg } }))
     },
     onError: (err: any, vars) => {
       const msg = err?.response?.data?.detail ?? err?.message ?? 'Upload failed'
@@ -225,7 +226,7 @@ export default function Connectors() {
                       </label>
                       {uploadStatus[conn.id]?.name && (
                         <span className={`text-[10px] max-w-[140px] truncate ${uploadStatus[conn.id]?.err ? 'text-red-500' : uploadStatus[conn.id]?.ok ? 'text-emerald-600' : 'text-ink-muted'}`}>
-                          {uploadStatus[conn.id]?.err ?? (uploadStatus[conn.id]?.ok ? `✓ ${uploadStatus[conn.id].name}` : uploadStatus[conn.id].name)}
+                          {uploadStatus[conn.id]?.err ?? ((uploadStatus[conn.id] as any)?.msg ?? uploadStatus[conn.id].name)}
                         </span>
                       )}
                     </div>

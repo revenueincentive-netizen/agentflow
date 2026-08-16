@@ -103,13 +103,26 @@ async def upload_file(
     upload_dir = os.path.join(settings.UPLOAD_DIR, str(user.tenant_id), str(connector_id))
     os.makedirs(upload_dir, exist_ok=True)
     file_path = os.path.join(upload_dir, file.filename or "upload")
+
+    # Check for duplicate filename
+    already_exists = os.path.exists(file_path)
+
     with open(file_path, "wb") as f:
         f.write(content)
 
-    connector.rag_status = "indexing"
-    # In production: enqueue a background task (Celery / ARQ) to run RAG ingestion
-    # For now return 202 Accepted
-    return {"message": "File received. Indexing started.", "file": file.filename}
+    # Store filename in extra and mark ready immediately (no background vector indexing in this tier)
+    extra = connector.extra or {}
+    extra["filename"] = file.filename
+    extra["file_path"] = file_path
+    connector.extra = extra
+    connector.rag_status = "ready"
+    await db.commit()
+
+    return {
+        "message": "File uploaded successfully.",
+        "file": file.filename,
+        "duplicate": already_exists,
+    }
 
 
 @router.delete("/{connector_id}", status_code=status.HTTP_204_NO_CONTENT)
