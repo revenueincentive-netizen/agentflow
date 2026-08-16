@@ -18,19 +18,24 @@ export default function Settings() {
   const [showForm, setShowForm] = useState(false)
   const [provider, setProvider] = useState('openai')
   const [form, setForm] = useState({ name: '', model: '', api_key: '', is_default: false, extra: '{}' })
+  const [formError, setFormError] = useState<string | null>(null)
 
   const { data: configs = [] } = useQuery<LLMConfig[]>({
     queryKey: ['llm-configs'],
-    queryFn: () => api.get('/llm-configs').then(r => r.data),
+    queryFn: () => api.get('/llm-configs/').then(r => r.data),
   })
 
   const createMutation = useMutation({
-    mutationFn: (body: any) => api.post('/llm-configs', body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['llm-configs'] }); setShowForm(false) },
+    mutationFn: (body: any) => api.post('/llm-configs/', body),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['llm-configs'] }); setShowForm(false); setFormError(null) },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.detail ?? err?.message ?? 'Failed to save provider'
+      setFormError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+    },
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/llm-configs/${id}`),
+    mutationFn: (id: string) => api.delete(`/llm-configs/${id}/`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['llm-configs'] }),
   })
 
@@ -86,9 +91,15 @@ export default function Settings() {
             Set as default for all agents
           </label>
           <div className="flex gap-2 pt-1">
-            <button onClick={() => createMutation.mutate({ ...form, provider, extra: JSON.parse(form.extra || '{}') })} className="btn-primary">Save provider</button>
-            <button onClick={() => setShowForm(false)} className="btn-secondary">Cancel</button>
+            <button
+              onClick={() => { setFormError(null); createMutation.mutate({ ...form, provider, extra: JSON.parse(form.extra || '{}') }) }}
+              disabled={createMutation.isPending}
+              className="btn-primary disabled:opacity-50">
+              {createMutation.isPending ? 'Saving...' : 'Save provider'}
+            </button>
+            <button onClick={() => { setShowForm(false); setFormError(null) }} className="btn-secondary">Cancel</button>
           </div>
+          {formError && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{formError}</p>}
         </div>
       )}
 
