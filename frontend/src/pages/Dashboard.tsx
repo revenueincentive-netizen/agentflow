@@ -6,20 +6,20 @@ import { useAuthStore } from '../store/authStore'
 
 const STEPS = [
   { step: 1, title: 'Add your LLM', desc: 'Plug in your OpenAI, Azure, Anthropic, or Google key.', to: '/settings', cta: 'Go to Settings' },
-  { step: 2, title: 'Connect your CRM', desc: 'Give agents access to your live Salesforce or HubSpot pipeline.', to: '/connectors', cta: 'Add connector' },
+  { step: 2, title: 'Connect your data', desc: 'Give agents access to your pipeline via file, CRM, or database.', to: '/connectors', cta: 'Add connector' },
   { step: 3, title: 'Deploy a sales agent', desc: 'One-click deploy from pre-built templates — domain expertise included.', to: '/templates', cta: 'Browse templates' },
 ]
 
 export default function Dashboard() {
   const { user } = useAuthStore()
-  const { data: agents = [] } = useQuery({ queryKey: ['agents'], queryFn: () => api.get('/agents').then(r => r.data) })
-  const { data: connectors = [] } = useQuery({ queryKey: ['connectors'], queryFn: () => api.get('/connectors').then(r => r.data) })
-  const { data: llmConfigs = [] } = useQuery({ queryKey: ['llm-configs'], queryFn: () => api.get('/llm-configs').then(r => r.data) })
+  const { data: agents = [] } = useQuery({ queryKey: ['agents'], queryFn: () => api.get('/agents/').then(r => r.data) })
+  const { data: connectors = [] } = useQuery({ queryKey: ['connectors'], queryFn: () => api.get('/connectors/').then(r => r.data) })
+  const { data: llmConfigs = [] } = useQuery({ queryKey: ['llm-configs'], queryFn: () => api.get('/llm-configs/').then(r => r.data) })
 
   const hasLLM = llmConfigs.length > 0
-  const hasCRM = connectors.some((c: any) => c.connector_type === 'crm')
+  const hasConnector = connectors.length > 0
   const hasAgent = agents.length > 0
-  const stepDone = [hasLLM, hasCRM, hasAgent]
+  const stepDone = [hasLLM, hasConnector, hasAgent]
   const isReady = stepDone.every(Boolean)
 
   const stats = [

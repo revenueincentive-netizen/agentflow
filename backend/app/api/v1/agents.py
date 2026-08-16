@@ -45,6 +45,14 @@ class AgentOut(BaseModel):
     is_public: bool
 
 
+class AgentUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    system_prompt: str | None = None
+    connector_ids: list[str] | None = None
+    llm_config_id: str | None = None
+
+
 class ChatRequest(BaseModel):
     message: str
     conversation_id: str | None = None
@@ -161,7 +169,34 @@ async def delete_agent(
     await db.delete(agent)
 
 
-@router.post("/{agent_id}/chat")
+@router.patch("/{agent_id}", response_model=AgentOut)
+async def update_agent(
+    agent_id: uuid.UUID,
+    body: AgentUpdate,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    result = await db.execute(select(Agent).where(Agent.id == agent_id, Agent.tenant_id == user.tenant_id))
+    agent = result.scalar_one_or_none()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    if body.name is not None:
+        agent.name = body.name
+    if body.description is not None:
+        agent.description = body.description
+    if body.system_prompt is not None:
+        agent.system_prompt = body.system_prompt
+    if body.connector_ids is not None:
+        agent.connector_ids = body.connector_ids
+    if body.llm_config_id is not None:
+        agent.llm_config_id = uuid.UUID(body.llm_config_id)
+    await db.commit()
+    await db.refresh(agent)
+    return AgentOut(id=str(agent.id), name=agent.name, description=agent.description,
+                    system_prompt=agent.system_prompt, connector_ids=[str(c) for c in agent.connector_ids],
+                    settings=agent.settings, is_active=agent.is_active, is_public=agent.is_public)
+
+
 async def chat(
     agent_id: uuid.UUID,
     body: ChatRequest,
