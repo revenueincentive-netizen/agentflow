@@ -30,30 +30,36 @@ export default function Connectors() {
   const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ name: '', connector_type: 'file' as typeof TYPES[number], description: '', config: '{}' })
+  const [formError, setFormError] = useState<string | null>(null)
 
   const { data: connectors = [] } = useQuery<Connector[]>({
     queryKey: ['connectors'],
-    queryFn: () => api.get('/connectors').then(r => r.data),
+    queryFn: () => api.get('/connectors/').then(r => r.data),
   })
 
   const createMutation = useMutation({
-    mutationFn: (body: any) => api.post('/connectors', body),
+    mutationFn: (body: any) => api.post('/connectors/', body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['connectors'] })
       setShowForm(false)
+      setFormError(null)
       setForm({ name: '', connector_type: 'file', description: '', config: '{}' })
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.detail ?? err?.message ?? 'Failed to create connector'
+      setFormError(typeof msg === 'string' ? msg : JSON.stringify(msg))
     },
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/connectors/${id}`),
+    mutationFn: (id: string) => api.delete(`/connectors/${id}/`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['connectors'] }),
   })
 
   const uploadMutation = useMutation({
     mutationFn: ({ connectorId, file }: { connectorId: string; file: File }) => {
       const fd = new FormData(); fd.append('file', file)
-      return api.post(`/connectors/${connectorId}/upload`, fd)
+      return api.post(`/connectors/${connectorId}/upload/`, fd)
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['connectors'] }),
   })
@@ -139,14 +145,15 @@ export default function Connectors() {
           </div>
           <div className="flex gap-3 mt-5 pt-5 border-t border-surface-100">
             <button
-              onClick={() => createMutation.mutate({ ...form, config: JSON.parse(form.config || '{}') })}
+              onClick={() => { setFormError(null); createMutation.mutate({ ...form, config: JSON.parse(form.config || '{}') }) }}
               disabled={!form.name || createMutation.isPending}
-              className="btn-primary"
+              className="btn-primary disabled:opacity-50"
             >
               {createMutation.isPending ? 'Adding...' : 'Add connector'}
             </button>
-            <button onClick={() => setShowForm(false)} className="btn-secondary">Cancel</button>
+            <button onClick={() => { setShowForm(false); setFormError(null) }} className="btn-secondary">Cancel</button>
           </div>
+          {formError && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 mt-2">{formError}</p>}
         </div>
       )}
 

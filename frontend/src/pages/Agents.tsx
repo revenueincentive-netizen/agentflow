@@ -13,18 +13,18 @@ export default function Agents() {
 
   const { data: agents = [] } = useQuery<Agent[]>({
     queryKey: ['agents'],
-    queryFn: () => api.get('/agents').then(r => r.data),
+    queryFn: () => api.get('/agents/').then(r => r.data),
   })
 
   const { data: connectors = [] } = useQuery({
     queryKey: ['connectors'],
-    queryFn: () => api.get('/connectors').then(r => r.data),
+    queryFn: () => api.get('/connectors/').then(r => r.data),
   })
 
   const [selectedConnectors, setSelectedConnectors] = useState<string[]>([])
 
   const createMutation = useMutation({
-    mutationFn: (body: any) => api.post('/agents', body),
+    mutationFn: (body: any) => api.post('/agents/', body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['agents'] })
       setShowForm(false)
@@ -34,7 +34,7 @@ export default function Agents() {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/agents/${id}`),
+    mutationFn: (id: string) => api.delete(`/agents/${id}/`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['agents'] }),
   })
 
