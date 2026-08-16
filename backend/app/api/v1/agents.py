@@ -110,13 +110,18 @@ async def list_conversations(
     db: Annotated[AsyncSession, Depends(get_db)],
     q: str | None = None,
 ):
-    """Return the 20 most recent conversations for this agent, optionally filtered by keyword."""
+    """Return the 20 most recent conversations for this agent, optionally filtered by keyword.
+    Members see only their own conversations; admins/owners see all.
+    """
     from sqlalchemy import desc
+    filters = [Conversation.agent_id == agent_id, Conversation.tenant_id == user.tenant_id]
+    if user.role == "member":
+        filters.append(Conversation.user_id == user.id)
     result = await db.execute(
         select(Conversation)
-        .where(Conversation.agent_id == agent_id, Conversation.tenant_id == user.tenant_id)
+        .where(*filters)
         .order_by(desc(Conversation.updated_at))
-        .limit(100)  # fetch more so we can filter client-side via q
+        .limit(100)
     )
     convs = result.scalars().all()
     rows = [
@@ -360,7 +365,7 @@ async def chat(
                             for msg in node_output.get("messages", []):
                                 tool_name = getattr(msg, "name", "data source")
                                 yield f"data: [STATUS:Searching {tool_name}...]\n\n"
-                        elif node_name == "call_llm":
+                        elif node_name == "llm":
                             for msg in node_output.get("messages", []):
                                 if not (hasattr(msg, "tool_calls") and msg.tool_calls):
                                     async for chunk_data in _stream_text(_extract_text(msg.content)):
