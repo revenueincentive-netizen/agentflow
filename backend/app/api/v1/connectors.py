@@ -110,11 +110,11 @@ async def upload_file(
     with open(file_path, "wb") as f:
         f.write(content)
 
-    # Store filename in extra and mark ready immediately (no background vector indexing in this tier)
-    extra = connector.extra or {}
-    extra["filename"] = file.filename
-    extra["file_path"] = file_path
-    connector.extra = extra
+    # Store filename in config and mark ready immediately (no background vector indexing in this tier)
+    cfg = dict(connector.config or {})
+    cfg["filename"] = file.filename
+    cfg["file_path"] = file_path
+    connector.config = cfg
     connector.rag_status = "ready"
     await db.commit()
 
