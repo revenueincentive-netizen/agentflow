@@ -8,6 +8,7 @@ interface AuthState {
   isAuthenticated: boolean
   login: (email: string, password: string) => Promise<void>
   register: (companyName: string, email: string, password: string, fullName?: string) => Promise<void>
+  acceptInvite: (token: string, password: string, fullName?: string) => Promise<void>
   logout: () => void
   fetchMe: () => Promise<void>
 }
@@ -33,6 +34,14 @@ export const useAuthStore = create<AuthState>()(
           password,
           full_name: fullName,
         })
+        localStorage.setItem('access_token', data.access_token)
+        localStorage.setItem('refresh_token', data.refresh_token)
+        const me = await api.get('/auth/me')
+        set({ user: me.data, isAuthenticated: true })
+      },
+
+      acceptInvite: async (token, password, fullName) => {
+        const { data } = await api.post('/auth/accept-invite', { token, password, full_name: fullName })
         localStorage.setItem('access_token', data.access_token)
         localStorage.setItem('refresh_token', data.refresh_token)
         const me = await api.get('/auth/me')

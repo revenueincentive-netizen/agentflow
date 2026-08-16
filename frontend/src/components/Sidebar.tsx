@@ -3,17 +3,22 @@ import { Bot, Plug, Settings, LayoutDashboard, LogOut, Zap, ChevronRight } from 
 import { useAuthStore } from '../store/authStore'
 import { clsx } from 'clsx'
 
-const nav = [
+const adminNav = [
   { to: '/dashboard',  label: 'Dashboard',        icon: LayoutDashboard },
   { to: '/templates',  label: 'Agent Templates',  icon: Zap },
   { to: '/agents',     label: 'My Agents',        icon: Bot },
   { to: '/connectors', label: 'Data Connectors',  icon: Plug },
 ]
-const bottom = [{ to: '/settings', label: 'Settings', icon: Settings }]
+const memberNav = [
+  { to: '/agents', label: 'My Agents', icon: Bot },
+]
+const adminBottom = [{ to: '/settings', label: 'Settings', icon: Settings }]
 
 export default function Sidebar() {
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
+  const isMember = user?.role === 'member'
+  const nav = isMember ? memberNav : adminNav
 
   return (
     <aside className="flex flex-col w-[220px] min-h-screen bg-sidebar text-white border-r border-white/[0.06] flex-shrink-0">
@@ -62,7 +67,7 @@ export default function Sidebar() {
 
       {/* Bottom */}
       <div className="px-3 pb-4 space-y-0.5 border-t border-white/[0.06] pt-3">
-        {bottom.map(({ to, label, icon: Icon }) => (
+        {!isMember && adminBottom.map(({ to, label, icon: Icon }) => (
           <NavLink key={to} to={to}
             className={({ isActive }) =>
               clsx('flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-all duration-150',
@@ -79,7 +84,10 @@ export default function Sidebar() {
             <div className="w-6 h-6 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
               {user?.email?.[0]?.toUpperCase()}
             </div>
-            <p className="text-[11px] text-white/40 truncate flex-1">{user?.email}</p>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] text-white/40 truncate">{user?.email}</p>
+              {user?.role && <p className="text-[9px] text-white/25 capitalize">{user.role}</p>}
+            </div>
             <button onClick={() => { logout(); navigate('/login') }}
               className="text-white/25 hover:text-white/70 transition-colors" title="Sign out">
               <LogOut size={13} />
