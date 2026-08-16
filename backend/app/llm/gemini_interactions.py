@@ -4,9 +4,13 @@ Custom LangChain BaseChatModel using Google's new google-genai SDK (v2.x).
 Replaces langchain-google-genai which targets the deprecated
 GenerativeLanguage API (models/...). The new google-genai SDK uses the
 Interactions API, which works for all accounts including new users.
+
+NOTE: New Gemini API accounts require "thought_signature" to be passed back
+with every function response. This wrapper captures and preserves it.
 """
 from __future__ import annotations
 
+import base64
 import uuid
 from typing import Any, List, Optional
 
@@ -25,9 +29,15 @@ except ImportError as exc:  # pragma: no cover
 # ─── Message conversion ──────────────────────────────────────────────────────
 
 def _messages_to_genai(messages: List[BaseMessage]):
-    """Convert LangChain messages → (system_instruction, contents)."""
+    """Convert LangChain messages → (system_instruction, contents).
+
+    Preserves thought_signatures stored in AIMessage.additional_kwargs so
+    the model's function-call roundtrip validation succeeds.
+    """
     system_instruction: Optional[str] = None
     contents: list = []
+    # Maps tool_call_id → thought_signature bytes for the current AI turn
+    pending_sigs: dict[str, bytes] = {}
 
     for msg in messages:
         if isinstance(msg, SystemMessage):
@@ -42,36 +52,43 @@ def _messages_to_genai(messages: List[BaseMessage]):
             )
 
         elif isinstance(msg, AIMessage):
+            # Extract thought_signatures stored during the last _response_to_ai_message call
+            raw_sigs: dict = msg.additional_kwargs.get("thought_signatures", {})
+            pending_sigs = {k: base64.b64decode(v) for k, v in raw_sigs.items()}
+
             parts = []
             if msg.content:
                 parts.append(genai_types.Part(text=str(msg.content)))
             for tc in msg.tool_calls or []:
-                parts.append(
-                    genai_types.Part(
-                        function_call=genai_types.FunctionCall(
-                            name=tc["name"],
-                            args=tc.get("args") or {},
-                        )
+                call_id = tc["id"]
+                ts = pending_sigs.get(call_id)
+                part_kwargs: dict[str, Any] = {
+                    "function_call": genai_types.FunctionCall(
+                        id=call_id,
+                        name=tc["name"],
+                        args=tc.get("args") or {},
                     )
-                )
+                }
+                if ts:
+                    part_kwargs["thought_signature"] = ts
+                parts.append(genai_types.Part(**part_kwargs))
             if parts:
                 contents.append(genai_types.Content(role="model", parts=parts))
 
         elif isinstance(msg, ToolMessage):
-            # Tool results returned to the model
             fn_name = getattr(msg, "name", None) or msg.tool_call_id
-            contents.append(
-                genai_types.Content(
-                    role="user",
-                    parts=[
-                        genai_types.Part(
-                            function_response=genai_types.FunctionResponse(
-                                name=fn_name,
-                                response={"result": str(msg.content)},
-                            )
-                        )
-                    ],
+            ts = pending_sigs.get(msg.tool_call_id)
+            part_kwargs = {
+                "function_response": genai_types.FunctionResponse(
+                    id=msg.tool_call_id,
+                    name=fn_name,
+                    response={"result": str(msg.content)},
                 )
+            }
+            if ts:
+                part_kwargs["thought_signature"] = ts
+            contents.append(
+                genai_types.Content(role="user", parts=[genai_types.Part(**part_kwargs)])
             )
 
     return system_instruction, contents
@@ -125,28 +142,43 @@ def _tool_to_function_declaration(tool: Any) -> "genai_types.FunctionDeclaration
 # ─── Response conversion ──────────────────────────────────────────────────────
 
 def _response_to_ai_message(response: Any) -> AIMessage:
-    """Convert a google-genai GenerateContentResponse to LangChain AIMessage."""
+    """Convert a google-genai GenerateContentResponse to LangChain AIMessage.
+
+    Stores thought_signatures in additional_kwargs so they can be passed back
+    in the next function-response turn (required by new Gemini API accounts).
+    """
     candidate = response.candidates[0]
     text_parts: list[str] = []
     tool_calls: list[dict] = []
+    thought_signatures: dict[str, str] = {}  # call_id → base64-encoded bytes
 
     for part in candidate.content.parts:
         if hasattr(part, "text") and part.text:
             text_parts.append(part.text)
         fc = getattr(part, "function_call", None)
         if fc is not None:
+            # Use the model's own call id if present, else generate one
+            call_id = getattr(fc, "id", None) or f"call_{fc.name}_{uuid.uuid4().hex[:8]}"
             tool_calls.append(
                 {
-                    "id": f"call_{fc.name}_{uuid.uuid4().hex[:8]}",
+                    "id": call_id,
                     "name": fc.name,
                     "args": dict(fc.args) if fc.args else {},
                     "type": "tool_call",
                 }
             )
+            # Capture thought_signature from the Part (required for function response)
+            ts: Optional[bytes] = getattr(part, "thought_signature", None)
+            if ts:
+                thought_signatures[call_id] = base64.b64encode(ts).decode()
 
     content = "".join(text_parts)
+    additional_kwargs: dict[str, Any] = {}
+    if thought_signatures:
+        additional_kwargs["thought_signatures"] = thought_signatures
+
     if tool_calls:
-        return AIMessage(content=content, tool_calls=tool_calls)
+        return AIMessage(content=content, tool_calls=tool_calls, additional_kwargs=additional_kwargs)
     return AIMessage(content=content)
 
 
