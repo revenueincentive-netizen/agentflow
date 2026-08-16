@@ -31,6 +31,7 @@ export default function Connectors() {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ name: '', connector_type: 'file' as typeof TYPES[number], description: '', config: '{}' })
   const [formError, setFormError] = useState<string | null>(null)
+  const [uploadStatus, setUploadStatus] = useState<Record<string, { name: string; ok?: boolean; err?: string }>>({})
 
   const { data: connectors = [] } = useQuery<Connector[]>({
     queryKey: ['connectors'],
@@ -58,10 +59,18 @@ export default function Connectors() {
 
   const uploadMutation = useMutation({
     mutationFn: ({ connectorId, file }: { connectorId: string; file: File }) => {
+      setUploadStatus(s => ({ ...s, [connectorId]: { name: file.name } }))
       const fd = new FormData(); fd.append('file', file)
       return api.post(`/connectors/${connectorId}/upload`, fd)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['connectors'] }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['connectors'] })
+      setUploadStatus(s => ({ ...s, [vars.connectorId]: { name: s[vars.connectorId]?.name ?? '', ok: true } }))
+    },
+    onError: (err: any, vars) => {
+      const msg = err?.response?.data?.detail ?? err?.message ?? 'Upload failed'
+      setUploadStatus(s => ({ ...s, [vars.connectorId]: { name: s[vars.connectorId]?.name ?? '', err: typeof msg === 'string' ? msg : JSON.stringify(msg) } }))
+    },
   })
 
   const selectedType = TYPE_META[form.connector_type]
@@ -204,13 +213,22 @@ export default function Connectors() {
                     {conn.rag_status === 'not_indexed' ? 'Not indexed' : conn.rag_status === 'indexing' ? 'Indexing...' : 'Ready'}
                   </span>
                   {conn.connector_type === 'file' && (
-                    <label className="flex items-center gap-1.5 text-xs font-medium text-brand-600 cursor-pointer hover:text-brand-700 transition-colors">
-                      <Upload size={13} /> Upload file
-                      <input type="file" className="hidden" onChange={e => {
-                        const f = e.target.files?.[0]
-                        if (f) uploadMutation.mutate({ connectorId: conn.id, file: f })
-                      }} />
-                    </label>
+                    <div className="flex flex-col gap-1 items-end">
+                      <label className="flex items-center gap-1.5 text-xs font-medium text-brand-600 cursor-pointer hover:text-brand-700 transition-colors">
+                        <Upload size={13} />
+                        {uploadMutation.isPending && uploadMutation.variables?.connectorId === conn.id ? 'Uploading...' : 'Upload file'}
+                        <input type="file" className="hidden" accept=".csv,.xlsx,.xls,.pdf,.docx,.txt" onChange={e => {
+                          const f = e.target.files?.[0]
+                          if (f) uploadMutation.mutate({ connectorId: conn.id, file: f })
+                          e.target.value = ''
+                        }} />
+                      </label>
+                      {uploadStatus[conn.id]?.name && (
+                        <span className={`text-[10px] max-w-[140px] truncate ${uploadStatus[conn.id]?.err ? 'text-red-500' : uploadStatus[conn.id]?.ok ? 'text-emerald-600' : 'text-ink-muted'}`}>
+                          {uploadStatus[conn.id]?.err ?? (uploadStatus[conn.id]?.ok ? `✓ ${uploadStatus[conn.id].name}` : uploadStatus[conn.id].name)}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
