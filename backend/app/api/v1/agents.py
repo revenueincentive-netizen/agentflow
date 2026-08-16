@@ -269,27 +269,33 @@ async def chat(
         async def event_stream() -> AsyncGenerator[str, None]:
             full_response = ""
             try:
-                async for chunk in compiled_graph.astream(state, stream_mode="messages"):
-                    if not chunk:
-                        continue
-                    msg = chunk[0]
-                    if not hasattr(msg, "content") or not msg.content:
-                        continue
-                    # Gemini returns content as list of parts; others return a string
-                    raw = msg.content
-                    text = ""
-                    if isinstance(raw, str):
-                        text = raw
-                    elif isinstance(raw, list):
-                        text = "".join(p.get("text", "") if isinstance(p, dict) else str(p) for p in raw)
-                    if text:
-                        full_response += text
-                        yield f"data: {text}\n\n"
+                # Use ainvoke (reliable) then stream the result in word-sized chunks
+                result_state = await compiled_graph.ainvoke(state)
+                last_msg = result_state["messages"][-1]
+                raw = last_msg.content
+                if isinstance(raw, str):
+                    full_response = raw
+                elif isinstance(raw, list):
+                    full_response = "".join(
+                        p.get("text", "") if isinstance(p, dict) else str(p)
+                        for p in raw
+                    )
+                else:
+                    full_response = str(raw)
+                # Stream in ~40-char chunks for a typing effect
+                words = full_response.split(" ")
+                buf = ""
+                for word in words:
+                    buf += ("" if not buf else " ") + word
+                    if len(buf) >= 40:
+                        yield f"data: {buf} \n\n"
+                        buf = ""
+                if buf:
+                    yield f"data: {buf}\n\n"
             except Exception as e:
                 yield f"data: [ERROR] {e}\n\n"
                 yield "data: [DONE]\n\n"
                 return
-            # Persist conversation after streaming
             conversation.messages = prior_messages + [
                 {"role": "user", "content": body.message},
                 {"role": "assistant", "content": full_response or "[no response]"},

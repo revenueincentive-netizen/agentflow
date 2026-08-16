@@ -54,7 +54,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Setup checklist */}
+      {/* Setup checklist — shown until all 3 steps done */}
       {!isReady && (
         <div className="card p-6 mb-8">
           <div className="flex items-center justify-between mb-5">
@@ -91,6 +91,26 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Quick actions — always visible */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+        {[
+          { label: 'Add LLM', desc: 'OpenAI, Gemini, Claude…', to: '/settings', icon: Zap, color: 'text-violet-600', bg: 'bg-violet-50' },
+          { label: 'Add connector', desc: 'CSV, SQL, CRM…', to: '/connectors', icon: Plug, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'Deploy agent', desc: 'From a template', to: '/templates', icon: Bot, color: 'text-brand-600', bg: 'bg-brand-50' },
+          { label: 'My agents', desc: 'Chat & manage', to: '/agents', icon: ChevronRight, color: 'text-orange-500', bg: 'bg-orange-50' },
+        ].map(({ label, desc, to, icon: Icon, color, bg }) => (
+          <Link key={to} to={to} className="card-hover p-4 flex items-center gap-3">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${bg}`}>
+              <Icon size={15} className={color} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-ink leading-tight">{label}</p>
+              <p className="text-[11px] text-ink-faint truncate">{desc}</p>
+            </div>
+          </Link>
+        ))}
+      </div>
 
       {/* Agents */}
       <div className="flex items-center justify-between mb-4">
